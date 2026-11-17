@@ -9,8 +9,9 @@ GitHub Pages.
 - Entries, goals, reflections, and recovered drafts are stored in this browser.
   They are **not encrypted**. Anyone with access to this browser profile may
   read them. Use your phone's device lock and avoid shared devices.
-- Until you connect Google and choose **Sync now**, entries are on this device
-  only. Clearing site data or changing domains can remove that local copy.
+- Until you connect Google, select a Sheet, and see **Saved to Google Sheets**,
+  entries are on this device only. Clearing site data or changing domains can
+  remove that local copy.
 - Google access tokens stay only in memory. Reloading the page or token expiry
   requires connecting again; no background server stores a refresh token.
 - Disconnecting Google does not erase local entries or delete the spreadsheet.
@@ -45,7 +46,8 @@ connector cannot supply authorization to a website hosted on GitHub Pages.
 7. Choose **Connect Google**, grant Sheets access, then **Create my sheet**.
    Alternatively, enter a spreadsheet ID or normal Google Sheets link to a
    spreadsheet you own/can edit.
-8. Choose **Sync now**. The app creates its own **Jot It** tab if needed; it
+8. Saved changes sync automatically while connected and online. **Sync now**
+   is an optional manual retry. The app creates its own **Jot It** tab if needed; it
    refuses to overwrite a tab with incompatible data. It does not change
    other tabs or spreadsheet sharing settings.
 
@@ -67,7 +69,15 @@ deleted entry is a tombstone, not a permanently erased spreadsheet row.
 Do not edit/remove the Record JSON column. Human-readable columns are for
 inspection; edit entries through the app.
 
-Use one device at a time and sync before and after switching devices. If two
+Saved entries (including edits, favorites and deletions), goals, reflections,
+and profile changes queue a sync after a brief delay. Unsaved drafts are never
+sent. While the app is open, syncing retries every 30 seconds and on returning
+online or to the app. Connecting Google also fetches your Sheet. Keep the app
+open until **Saved to Google Sheets** appears; closing the app suspends syncing.
+Offline changes remain in the browser and sync after reconnection. Expired
+Google authorization requires a user-initiated reconnect in Settings.
+
+Use one device at a time and check the sync status before switching devices. If two
 devices edit the same entry without syncing, the later timestamp wins in the
 app; earlier revisions remain recoverable in the spreadsheet. Large entries
 must fit Google's cell limits; the app reports oversized records rather than

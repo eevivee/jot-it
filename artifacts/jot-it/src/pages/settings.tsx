@@ -1,37 +1,31 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { AlertTriangle, CloudOff, Cloud, Download, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { GOOGLE_KEY, SYNC_META_KEY, downloadJSON, readGoogleSettings, readJSON, useJournal, writeJSON } from '@/lib/journal-store';
-import { connectGoogle, createJournalSheet, disconnectGoogle, isGoogleConnected, syncJournal } from '@/lib/google-sheets';
+import { GOOGLE_KEY, downloadJSON, readGoogleSettings, useJournal, writeJSON } from '@/lib/journal-store';
+import { connectGoogle, createJournalSheet, disconnectGoogle } from '@/lib/google-sheets';
+import { useAutoSync } from '@/lib/auto-sync';
 import { todayISO } from '@/lib/journal-dates';
 
 const sheetIdFrom = (v: string) => v.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/)?.[1] ?? v.trim();
-interface SyncMeta { at: string; spreadsheetId: string; versions: Record<string, string> }
 
 export default function SettingsPage() {
-  const { name, saveName, records, replaceAll } = useJournal();
+  const { name, saveName, records } = useJournal();
+  const cloud = useAutoSync();
+  const { connected } = cloud;
   const { toast } = useToast();
   const [nameDraft, setNameDraft] = useState(name);
   const initial = readGoogleSettings();
   const [clientId, setClientId] = useState(initial.clientId);
   const [sheet, setSheet] = useState(initial.spreadsheetId);
-  const [connected, setConnected] = useState(() => { try { return isGoogleConnected(); } catch { return false; } });
   const [busy, setBusy] = useState<null | 'connect' | 'create' | 'sync'>(null);
   const [error, setError] = useState<string | null>(null);
-  const [syncMeta, setSyncMeta] = useState<SyncMeta | null>(() => readJSON<SyncMeta | null>(SYNC_META_KEY, null));
 
   const sheetId = sheetIdFrom(sheet);
-  const lastSync = syncMeta?.spreadsheetId === sheetId ? syncMeta.at : null;
-  const unsynced = !lastSync || records.some((r) => syncMeta?.versions?.[r.id] !== r.updatedAt);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setConnected(isGoogleConnected()), 15000);
-    return () => window.clearInterval(timer);
-  }, []);
 
   const persistSettings = (patch: { clientId?: string; spreadsheetId?: string }) => {
     const ok = writeJSON(GOOGLE_KEY, { clientId: clientId.trim(), spreadsheetId: sheetId, ...patch });
+    cloud.refresh();
     if (!ok) toast({ title: 'Settings not stored', description: 'This browser refused to save them.', variant: 'destructive' });
     return ok;
   };
@@ -44,7 +38,7 @@ export default function SettingsPage() {
     } catch (e) {
       const msg = (e as Error)?.message || String(e);
       setError(msg);
-      try { setConnected(isGoogleConnected()); } catch { setConnected(false); }
+      cloud.refresh();
     } finally {
       setBusy(null);
     }
@@ -52,51 +46,35 @@ export default function SettingsPage() {
 
   const connect = () => run('connect', async () => {
     if (!clientId.trim()) throw new Error('Paste your OAuth client ID first.');
-    persistSettings({});
+    if (!persistSettings({})) throw new Error('Save your Google settings before connecting.');
     await connectGoogle(clientId.trim());
-    setConnected(isGoogleConnected());
-    toast({ title: 'Google connected', description: 'Nothing has been synced yet.' });
+    cloud.refresh();
+    toast({ title: 'Google connected', description: 'Your saved journal will sync automatically when a sheet is selected.' });
   });
 
   const create = () => run('create', async () => {
     const id = await createJournalSheet();
     setSheet(id);
     persistSettings({ spreadsheetId: id });
-    toast({ title: 'Your sheet is ready', description: 'Press Sync now to copy your journal there.' });
+    toast({ title: 'Your sheet is ready', description: 'Your saved journal will sync automatically.' });
   });
 
   const sync = () => run('sync', async () => {
     if (!sheetId) throw new Error('Add a spreadsheet ID or create a sheet first.');
-    const res = await syncJournal(records, sheetId);
-    const saved = replaceAll(res.records);
-    if (!saved.ok) throw new Error(`Synced with Google, but this device could not store the merged journal: ${saved.error}`);
-    setSheet(res.spreadsheetId);
-    persistSettings({ spreadsheetId: res.spreadsheetId });
-    const at = new Date().toISOString();
-    const meta: SyncMeta = {
-      at, spreadsheetId: res.spreadsheetId,
-      versions: Object.fromEntries(res.records.map((record) => [record.id, record.updatedAt])),
-    };
-    if (!writeJSON(SYNC_META_KEY, meta)) {
-      throw new Error('Your journal reached Google, but this browser could not save the sync receipt. Repeating sync is safe.');
-    }
-    setSyncMeta(meta);
-    toast({ title: 'Synced', description: `${res.records.length} records in step with your sheet.` });
+    if (!persistSettings({})) throw new Error('This browser could not store your Sheet settings.');
+    await cloud.syncNow();
+    toast({ title: 'Synced', description: 'Your saved journal is in step with your sheet.' });
   });
 
   const disconnect = () => {
     disconnectGoogle();
-    setConnected(false);
+    cloud.refresh();
     toast({ title: 'Disconnected from Google', description: 'Your entries stay on this device.' });
   };
 
-  const status = !connected
-    ? { icon: CloudOff, label: sheetId ? 'Not connected — on this device only' : 'On this device only', tone: 'bg-muted' }
-    : !lastSync
-      ? { icon: Cloud, label: 'Connected · not synced yet', tone: 'bg-accent' }
-      : unsynced
-        ? { icon: Cloud, label: `Connected · changes since last sync (${new Date(lastSync).toLocaleString()})`, tone: 'bg-accent' }
-        : { icon: Cloud, label: `Synced ${new Date(lastSync).toLocaleString()}`, tone: 'bg-secondary' };
+  const status = { icon: connected ? Cloud : CloudOff, label: cloud.label, tone: connected ? 'bg-secondary' : 'bg-muted' };
+  const working = !!busy || cloud.syncing;
+  const displayError = error || cloud.error;
 
   const field = 'w-full rounded-2xl border border-input bg-card px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-ring';
   const btn = 'inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm transition-all active:scale-[.97] disabled:opacity-40';
@@ -128,7 +106,7 @@ export default function SettingsPage() {
           </span>
         </div>
         <p className="text-sm text-muted-foreground">
-          Optional. Jot It works fully without it. Sync copies your journal to a spreadsheet in your own Google Drive — only when you press Sync now.
+          Saved entries, goals and reflections sync automatically while Google is connected and you’re online. A backup stays on this device. Offline changes retry when you reconnect.
         </p>
         <details className="rounded-2xl bg-muted/60 px-4 py-3 text-sm">
           <summary className="font-medium">Before connecting: one-time Google Cloud setup</summary>
@@ -142,12 +120,12 @@ export default function SettingsPage() {
 
         <label className="block space-y-1.5">
           <span className="text-xs uppercase tracking-[.18em] text-muted-foreground">OAuth client ID</span>
-          <input value={clientId} disabled={!!busy} onChange={(e) => { disconnectGoogle(); setConnected(false); setClientId(e.target.value); }} onBlur={() => persistSettings({})}
+          <input value={clientId} disabled={working} onChange={(e) => { disconnectGoogle(); cloud.refresh(); setClientId(e.target.value); }} onBlur={() => persistSettings({})}
             placeholder="1234…apps.googleusercontent.com" className={cn(field, 'font-mono text-xs')} data-testid="input-client-id" />
         </label>
         <label className="block space-y-1.5">
           <span className="text-xs uppercase tracking-[.18em] text-muted-foreground">Spreadsheet ID or URL</span>
-          <input value={sheet} disabled={!!busy} onChange={(e) => setSheet(e.target.value)} onBlur={() => persistSettings({})}
+          <input value={sheet} disabled={working} onChange={(e) => setSheet(e.target.value)} onBlur={() => persistSettings({})}
             placeholder="Paste a sheet link, or create one below" className={cn(field, 'font-mono text-xs')} data-testid="input-sheet-id" />
         </label>
         {sheetId && (
@@ -157,33 +135,33 @@ export default function SettingsPage() {
           </a>
         )}
 
-        {error && (
+        {displayError && (
           <div className="flex gap-2 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm" data-testid="text-sync-error">
             <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
             <div>
-              <p>{error}</p>
-              <p className="mt-1 text-muted-foreground">Nothing was overwritten on this device. If your Google session expired, reconnect and try again.</p>
-              <button className="mt-2 text-primary underline" onClick={connect} data-testid="button-reconnect">Reconnect Google</button>
+              <p>{displayError}</p>
+              <p className="mt-1 text-muted-foreground">Your saved changes remain on this device. Automatic retries run while connected. If your Google session expired, reconnect.</p>
+              <button className="mt-2 text-primary underline" disabled={working} onClick={connect} data-testid="button-reconnect">Reconnect Google</button>
             </div>
           </div>
         )}
 
         <div className="flex flex-wrap gap-2 pt-1">
           {connected ? (
-            <button className={cn(btn, 'border border-border')} disabled={!!busy} onClick={disconnect} data-testid="button-disconnect">Disconnect</button>
+            <button className={cn(btn, 'border border-border')} disabled={working} onClick={disconnect} data-testid="button-disconnect">Disconnect</button>
           ) : (
-            <button className={cn(btn, 'bg-primary text-primary-foreground')} onClick={connect} disabled={!!busy} data-testid="button-connect">
+            <button className={cn(btn, 'bg-primary text-primary-foreground')} onClick={connect} disabled={working} data-testid="button-connect">
               {busy === 'connect' && <Loader2 className="h-4 w-4 animate-spin" />} Connect Google
             </button>
           )}
-          <button className={cn(btn, 'bg-accent text-accent-foreground')} onClick={create} disabled={!connected || !!busy} data-testid="button-create-sheet">
+          <button className={cn(btn, 'bg-accent text-accent-foreground')} onClick={create} disabled={!connected || working} data-testid="button-create-sheet">
             {busy === 'create' && <Loader2 className="h-4 w-4 animate-spin" />} Create my sheet
           </button>
-          <button className={cn(btn, 'bg-secondary text-secondary-foreground')} onClick={sync} disabled={!connected || !sheetId || !!busy} data-testid="button-sync">
-            {busy === 'sync' ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Sync now
+          <button className={cn(btn, 'bg-secondary text-secondary-foreground')} onClick={sync} disabled={!connected || !sheetId || working} data-testid="button-sync">
+            {cloud.syncing || busy === 'sync' ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Sync now
           </button>
         </div>
-        <p className="text-xs text-muted-foreground">Save any entry you are writing before syncing — unsaved words are not sent.</p>
+        <p className="text-xs text-muted-foreground">Tap Save on an entry to queue automatic syncing; unfinished drafts stay on this device. Keep Jot It open until “Saved to Google Sheets” appears. Sync now is available as a manual retry.</p>
       </section>
 
       <section className="space-y-3">

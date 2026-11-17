@@ -14,6 +14,7 @@ import { JournalProvider, downloadJSON, useJournal } from '@/lib/journal-store';
 import { dueGoals } from '@/components/journal-bits';
 import { todayISO } from '@/lib/journal-dates';
 import { cn } from '@/lib/utils';
+import { AutoSyncProvider, useAutoSync } from '@/lib/auto-sync';
 
 const NAV = [
   { href: '/', label: 'Journal', icon: BookOpen },
@@ -85,10 +86,14 @@ function Recovery() {
 
 function Routes() {
   const { loadError } = useJournal();
+  const cloud = useAutoSync();
   const [location] = useLocation();
   if (loadError) return <Recovery />;
   return (
     <Shell>
+      <div role="status" aria-live="polite" className="mx-auto max-w-5xl px-4 pt-4 text-xs text-muted-foreground md:px-10" data-testid="global-sync-status">
+        <Link href="/settings" className="underline-offset-4 hover:underline">{cloud.label}</Link>
+      </div>
       <ErrorBoundary resetKey={location}>
         <Switch>
           <Route path="/" component={JournalPage} />
@@ -106,9 +111,11 @@ function App() {
   return (
     <TooltipProvider>
       <JournalProvider>
+        <AutoSyncProvider>
         <WouterRouter hook={useHashLocation}>
           <Routes />
         </WouterRouter>
+        </AutoSyncProvider>
       </JournalProvider>
       <Toaster />
     </TooltipProvider>

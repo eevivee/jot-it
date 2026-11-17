@@ -32,3 +32,12 @@ when those periods finish.
 **How to apply:** Keep historical goals when periods roll over, and keep whole
 weeks together across month boundaries. Use 52 or 53 ISO weeks as needed;
 do not force every calendar year to exactly 52.
+
+Keep the local browser journal and draft recovery; synchronize saved changes
+automatically to the user's private Google Sheet while connected.
+
+**Why:** The user considered Sheet-only storage but decided to keep the current
+storage approach and requested automatic saving/syncing to Google Sheets.
+
+**How to apply:** Preserve offline local saves. Only report cloud success after
+Google confirms it, and make pending changes and reconnect requirements visible.

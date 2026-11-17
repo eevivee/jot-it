@@ -35,7 +35,7 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
   A Replit connector would not authorize the separately hosted GitHub website.
   Only a public OAuth client ID is configured; never add a client secret.
 - Local data is not encrypted. Do not describe the app as end-to-end encrypted.
-- Cloud synchronization is explicit; never claim device-only saves reached Sheets.
+- Saved changes synchronize automatically while Google is connected and online; never claim device-only saves reached Sheets before a successful receipt.
 
 ## Product
 
