@@ -6,6 +6,7 @@ import type { Entry, Goal, GoalPeriod, Mood } from '@/lib/journal-types';
 import { DRAFT_KEY, nowStamp, readJSON, uid, useJournal, writeJSON } from '@/lib/journal-store';
 import { periodLabel, periodRange, prettyDate, todayISO } from '@/lib/journal-dates';
 import { CheckinCard, ConfirmDelete, EmptyNote, MoodBadge, MoodBar, dueGoals } from '@/components/journal-bits';
+import { useAutoSync } from '@/lib/auto-sync';
 
 interface Draft {
   editingId: string | null;
@@ -37,6 +38,7 @@ const blank = (date: string): Draft => ({ editingId: null, date, title: '', body
 
 export default function JournalPage() {
   const { entries, goals, reflections, name, saveEntry } = useJournal();
+  const cloud = useAutoSync();
   const { toast } = useToast();
   const today = todayISO();
   const [draft, setDraft] = useState<Draft>(() => blank(today));
@@ -101,7 +103,12 @@ export default function JournalPage() {
     try { localStorage.removeItem(DRAFT_KEY); } catch { /* draft cleanup is best-effort */ }
     dirty.current = false;
     setDraft(blank(draft.date));
-    toast({ title: existing ? 'Entry updated' : 'Saved to this device', description: prettyDate(e.date) });
+    toast({
+      title: existing ? 'Entry updated on this device' : 'Entry saved on this device',
+      description: cloud.connected
+        ? 'Google sync is queued. Check the status below for confirmation.'
+        : 'Connect Google in Settings to sync this entry to your Sheet.',
+    });
   };
 
   const startEdit = (e: Entry) => {
@@ -223,6 +230,13 @@ export default function JournalPage() {
               {draft.editingId ? 'Save changes' : 'Keep this entry'}
             </button>
           </div>
+          <p className="mt-3 text-right text-xs text-muted-foreground" role="status" aria-live="polite" data-testid="entry-sync-status">
+            {cloud.label}
+            {cloud.error && <span className="mt-1 block text-destructive">{cloud.error}</span>}
+            {(!cloud.connected || cloud.error) && (
+              <a href="#/settings" className="ml-1 underline">Open Settings</a>
+            )}
+          </p>
         </section>
 
         <section className="space-y-3">
