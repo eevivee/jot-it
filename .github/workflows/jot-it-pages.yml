@@ -1,0 +1,54 @@
+name: Publish Jot It to GitHub Pages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: jot-it-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build static journal
+        env:
+          PORT: '4173'
+          BASE_PATH: /
+          NODE_ENV: production
+        run: |
+          REPOSITORY_NAME="${GITHUB_REPOSITORY#*/}"
+          if [[ "$REPOSITORY_NAME" == *.github.io ]]; then
+            export BASE_PATH="/"
+          else
+            export BASE_PATH="/${REPOSITORY_NAME}/"
+          fi
+          pnpm --filter @workspace/jot-it run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: artifacts/jot-it/dist/public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish website
+        id: deployment
+        uses: actions/deploy-pages@v4

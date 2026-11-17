@@ -1,9 +1,12 @@
-# [Project name]
+# Jot It
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A personal, phone-first journal with moods, intentions, and conversational goal reflections.
 
 ## Run & Operate
 
+- `pnpm --filter @workspace/jot-it run dev` — managed Jot It frontend workflow
+- `pnpm --filter @workspace/jot-it run typecheck` — check the journal
+- See `artifacts/jot-it/README.md` for Google authorization and GitHub Pages setup.
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
@@ -26,11 +29,20 @@ _Populate as you build — short repo map plus pointers to the source-of-truth f
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Jot It must work as a static GitHub Pages website, without the shared API or
+  database. The scaffolded backend is not the journal's storage.
+- The private Google Sheets connection uses Google's browser OAuth token model.
+  A Replit connector would not authorize the separately hosted GitHub website.
+  Only a public OAuth client ID is configured; never add a client secret.
+- Local data is not encrypted. Do not describe the app as end-to-end encrypted.
+- Cloud synchronization is explicit; never claim device-only saves reached Sheets.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+Phone-first journaling, emoji moods, dated entries, daily greetings, tomorrow /
+weekly / quarterly / yearly goals, overdue achievement reflections, searchable
+collapsible archives, favorites, draft recovery, JSON export, and private Sheets
+sync. Weeks run Monday through Sunday. No app-store distribution is needed.
 
 ## User preferences
 

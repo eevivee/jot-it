@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Jot It"
+description = "A sophisticated phone-first personal journal with moods, daily intentions, period goals and gentle reflections. Static GitHub Pages-compatible website with private Google Sheets synchronization."
+version = "1.0.0"
+id = "artifacts/jot-it"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22969
+
+[services.development]
+run = "pnpm --filter @workspace/jot-it run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/jot-it", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/jot-it/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22969"
+BASE_PATH = "/"

@@ -1,0 +1,1 @@
+- [Jot It scope](jot-it-scope.md) — personal phone journal, static GitHub Pages hosting, private Google Sheets, and Monday–Sunday weeks.
