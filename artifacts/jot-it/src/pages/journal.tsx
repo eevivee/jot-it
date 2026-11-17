@@ -278,11 +278,11 @@ export function EntryActions({ e, onEdit, onFav, onDelete }: { e: Entry; onEdit:
   );
 }
 
-const SLOTS: { period: GoalPeriod; label: string; tone: string }[] = [
-  { period: 'day', label: 'Tomorrow', tone: 'bg-[#b6dfd2]' },
-  { period: 'week', label: 'This week', tone: 'bg-[#94b5d8]' },
-  { period: 'quarter', label: 'This quarter', tone: 'bg-[#d9c6cb]' },
-  { period: 'year', label: 'This year', tone: 'bg-[#9c8188]' },
+const SLOTS: { period: GoalPeriod; label: string; tone: string; prompt: string }[] = [
+  { period: 'day', label: 'Tomorrow', tone: 'bg-[#b6dfd2]', prompt: "What's tomorrow's W.I.N.?" },
+  { period: 'week', label: 'This week', tone: 'bg-[#94b5d8]', prompt: 'What would make this an amazing week?' },
+  { period: 'quarter', label: 'This quarter', tone: 'bg-[#d9c6cb]', prompt: 'What would make this a successful quarter?' },
+  { period: 'year', label: 'This year', tone: 'bg-[#9c8188]', prompt: 'What would make this an incredible year?' },
 ];
 
 function GoalsBoard({ today }: { today: string }) {
@@ -321,7 +321,7 @@ function GoalSlot({ slot, today }: { slot: (typeof SLOTS)[number]; today: string
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={3}
-        placeholder={slot.period === 'day' ? 'One small thing per line…' : 'What would make this count?'}
+        placeholder={slot.prompt}
         className="font-display mt-2 w-full resize-none bg-transparent text-[15px] leading-relaxed outline-none placeholder:font-sans placeholder:text-sm placeholder:text-muted-foreground/60"
         data-testid={`input-goal-${slot.period}`}
       />
